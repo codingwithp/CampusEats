@@ -29,6 +29,35 @@ router.get('/MenuItem', async (req, res) => {
     res.status(500).json({ error: "Failed to fetch menu items" });
   }
 });
+// Example Express route
+router.get('/MenuItem/:canteenName', async (req, res) => {
+  const canteenName = req.params.canteenName;
+
+  try {
+    const menuItems = await MenuItem.find({ canteen: canteenName });
+
+    if (!menuItems.length) {
+      return res.status(404).json({ msg: "No menu items found" });
+    }
+
+    res.json({ menuItems });
+  } catch (err) {
+    console.error("Error fetching menu items:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+// routes/MenuItem.js
+router.post("/MenuItemsByIds", async (req, res) => {
+  try {
+    const { ids } = req.body;
+    const items = await MenuItem.find({ _id: { $in: ids } });
+    res.json({ items });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch items" });
+  }
+});
+// router.push(`/checkout?name=${encodeURIComponent(canteen.name)}&location=${encodeURIComponent(canteen.location)}`);
+
 
 
 // Add a menu item
