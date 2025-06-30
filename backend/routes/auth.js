@@ -1,8 +1,10 @@
 const express = require("express");
 const { register, login } = require("../controllers/authController");
+const mongoose = require("mongoose");
 
 const MenuItem = require("../models/MenuItem");
 const router = express.Router();
+const Order = require("../models/Order");
 
 router.post("/register", register);
 router.post("/login", login);
@@ -63,26 +65,49 @@ router.post("/MenuItemsByIds", async (req, res) => {
 // Add a menu item
 router.post('/MenuItem', async (req, res) => {
   try {
+    console.log("Incoming data:", req.body); // 👈 Add this line
+
     const newItem = new MenuItem(req.body);
-    await newItem.save();
-    res.status(201).json(newItem);
+    const savedItem = await newItem.save();
+
+    console.log("Saved item:", savedItem); // 👈 Add this line
+
+    res.status(201).json(savedItem);
   } catch (err) {
+    console.error("Add MenuItem error:", err); // 👈 Show error
     res.status(500).json({ error: "Failed to add menu item" });
   }
 });
+
 router.patch('/MenuItem/:id/toggle-availability', async (req, res) => {
-  const id = req.params.id;
-  const { available } = req.body;
+  try {
+    const id = req.params.id;
+    const { available } = req.body;
 
-  // Find item by id and update availability
-  const updatedItem = await MenuItem.findByIdAndUpdate(id, { available }, { new: true });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid item ID" });
+    }
 
-  if (!updatedItem) {
-    return res.status(404).send({ error: 'Item not found' });
+    const updatedItem = await MenuItem.findByIdAndUpdate(
+      id,
+      { available },
+      { new: true }
+    );
+
+    if (!updatedItem) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    res.json(updatedItem);
+  } catch (err) {
+    console.error("Toggle availability error:", err.message, err.stack); // ✅ This line is important
+    res.status(500).json({ error: 'Server error' });
   }
-
-  res.send(updatedItem);
 });
+
+
+
+
 
 
 
@@ -101,55 +126,24 @@ router.delete('/MenuItem/:id', async (req, res) => {
 
 
 
-router.post('/orderData', async (req, res) => {
-    let data = req.body.order_data
-    await data.splice(0,0,{Order_date:req.body.order_date})
-    console.log("1231242343242354",req.body.email)
-
-    //if email not exisitng in db then create: else: InsertMany()
-    let eId = await Order.findOne({ 'email': req.body.email })    
-    console.log(eId)
-    if (eId===null) {
-        try {
-            console.log(data)
-            console.log("1231242343242354",req.body.email)
-            await Order.create({
-                email: req.body.email,
-                order_data:[data]
-            }).then(() => {
-                res.json({ success: true })
-            })
-        } catch (error) {
-            console.log(error.message)
-            res.send("Server Error", error.message)
-
-        }
-    }
-
-    else {
-        try {
-            await Order.findOneAndUpdate({email:req.body.email},
-                { $push:{order_data: data} }).then(() => {
-                    res.json({ success: true })
-                })
-        } catch (error) {
-            console.log(error.message)
-            res.send("Server Error", error.message)
-        }
-    }
-})
-router.post('/myOrderData', async (req, res) => {
-    try {
-        console.log(req.body.email)
-        let eId = await Order.findOne({ 'email': req.body.email })
-        //console.log(eId)
-        res.json({orderData:eId})
-    } catch (error) {
-        res.send("Error",error.message)
-    }
-    
-
+router.get("/order", async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ orderTime: -1 });
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch orders" });
+  }
 });
 
-
+// PUT to update order status
+router.put("/order", async (req, res) => {
+  const { id, status } = req.body;
+  try {
+    const updated = await Order.findOneAndUpdate({ _id: id }, { status }, { new: true });
+    if (!updated) return res.status(404).json({ error: "Order not found" });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update order" });
+  }
+});
 module.exports = router
